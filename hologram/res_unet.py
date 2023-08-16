@@ -1,8 +1,10 @@
 """ Full assembly of the parts to form the complete network """
+import numpy as np
 import torch
 import torch.nn as nn
 from modules import Conv, UpsampleBlock, ResidualBlock
-
+from dataset_loader import MyDataset
+from torch.utils.data import DataLoader
 
 class ResUNet(nn.Module):
     def __init__(self):
@@ -57,7 +59,7 @@ class ResUNet(nn.Module):
 if __name__ == '__main__':
     H = 256
     W = 256
-    bz = 10
+    bz = 3
     lr = 1e-4
     loss_accept_thresh = 0.1
     resUnet = ResUNet()
@@ -65,17 +67,36 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam([
         {'params': resUnet.parameters(), 'lr': lr},
     ])
-
-    ################################################### simple test #########################################
-    test_input = torch.zeros([bz, 2, H, W], dtype=torch.float)  # load your data
-    test_label = torch.ones([bz, 2, H, W], dtype=torch.float)
-    loss = 1000
-    while loss > loss_accept_thresh:
-        test_output = resUnet(test_input)
-        loss = loss_func(test_output, test_label)
-        # take gradient step
-        optimizer.zero_grad()
-        loss.mean().backward()
-        optimizer.step()
-        print(loss)
-
+    flg = "img_test"
+    ######################################################## train ##############################################################
+    if flg == "simple_test":
+        torch_inputs = torch.zeros([bz, 2, H, W], dtype=torch.float)  # load your data
+        torch_labels = torch.ones([bz, 2, H, W], dtype=torch.float)
+        loss = 1000
+        while loss > loss_accept_thresh:
+            torch_outputs = resUnet(torch_inputs)
+            loss = loss_func(torch_outputs, torch_labels)
+            # take gradient step
+            optimizer.zero_grad()
+            loss.mean().backward()
+            optimizer.step()
+            print(loss)
+    elif flg == "img_test":
+        input_dir = r"D:\PycharmProjects\phase_recovery\hologram\dataset\train\input"
+        label_dir = r"D:\PycharmProjects\phase_recovery\hologram\dataset\train\label"
+        mydataset = MyDataset(input_dir, label_dir)
+        dataloader = DataLoader(mydataset, batch_size=bz, shuffle=True)
+        for inputs, labels in dataloader:
+            input_amp, input_phase = inputs
+            label_amp, label_phase = labels
+            torch_inputs = torch.tensor(np.stack([input_amp, input_phase], axis=1), dtype=torch.float)
+            torch_labels = torch.tensor(np.stack([label_amp, label_phase], axis=1), dtype=torch.float)
+            torch_outputs = resUnet(torch_inputs)
+            loss = loss_func(torch_outputs, torch_labels)
+            # take gradient step
+            optimizer.zero_grad()
+            loss.mean().backward()
+            optimizer.step()
+            print(loss)
+            tt = 1
+            # get the data, according to your memory size. for example:
